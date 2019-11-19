@@ -10,7 +10,7 @@ defmodule Twitter.UserSupervisor do
   end
 
   def start_worker(id) do
-    {:ok, pid} = DynamicSupervisor.start_child(__MODULE__, {Twitter.User, id})
+    {:ok, pid} = DynamicSupervisor.start_child(__MODULE__, {Twitter.Client, id})
     pid
   end
 end

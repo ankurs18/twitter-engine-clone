@@ -9,7 +9,7 @@ defmodule TwitterEngineClone.Application do
     children = [
       # Starts a worker by calling: TwitterEngineClone.Worker.start_link(arg)
       # {TwitterEngineClone.Worker, arg}
-      Twitter.UserSupervisor, Twitter.Server
+      Twitter.UserSupervisor
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

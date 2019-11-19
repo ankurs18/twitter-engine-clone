@@ -1,4 +1,4 @@
-defmodule Twitter.User do
+defmodule Twitter.Client  do
     use GenServer, restart: :transient
   
     def start_link(id) do
@@ -11,4 +11,4 @@ defmodule Twitter.User do
     end
   
     def fetch_id(pid), do: GenServer.call(pid, {:fetch_id}, :infinity)
-        
+end        
