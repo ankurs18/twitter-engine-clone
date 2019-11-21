@@ -14,6 +14,7 @@ defmodule Twitter.Main do
     "#Avengers"
   ]
   def start(num_client \\ 10, num_message \\ 10) do
+    :observer.start()
     {:ok, _server_pid} = Twitter.Server.start_link(:no_args)
     # Twitter.Server.register_user(server_pid, "ankur")
 
