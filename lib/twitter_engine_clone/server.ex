@@ -40,6 +40,9 @@ defmodule Twitter.Server do
   def tweet(tweet, username),
     do: GenServer.cast(:server, {:handle_tweet, tweet, username})
 
+  def retweet(tweet_id, username),
+    do: GenServer.cast(:server, {:retweet, tweet_id, username})
+
   def delete_account(username),
     do: GenServer.cast(:server, {:delete_account, username})
 
@@ -88,7 +91,7 @@ defmodule Twitter.Server do
       else
         Enum.reduce(tweet_ids, [], fn tweet_id, acc ->
           [tup] = :ets.lookup(:tweets, tweet_id)
-          [elem(tup, 1) | acc]
+          [tup | acc]
         end)
       end
 
@@ -141,7 +144,8 @@ defmodule Twitter.Server do
 
   def handle_cast({:handle_tweet, tweet, username}, _state) do
     tweet_id = UUID.uuid1()
-    :ets.insert(:tweets, {tweet_id, tweet})
+    tweet_tuple = {tweet_id, tweet, username, nil}
+    :ets.insert(:tweets, tweet_tuple)
     [user] = :ets.lookup(:users, username)
     usermap = elem(user, 1)
     usermap = Map.put(usermap, :tweet_ids, [tweet_id | Map.get(usermap, :tweet_ids, [])])
@@ -152,9 +156,11 @@ defmodule Twitter.Server do
       IO.inspect({"mention", users_mentioned})
 
       if length(users_mentioned) > 0 do
-        Enum.each(users_mentioned, &process_mentions(&1, tweet_id, tweet))
+        Enum.each(users_mentioned, &process_mentions(&1, tweet_tuple))
       end
     end
+
+    distribute_to_following(tweet_tuple)
 
     if String.contains?(tweet, "#") do
       hashtags = parse_hashtags(tweet)
@@ -170,6 +176,18 @@ defmodule Twitter.Server do
 
   def handle_cast({:delete, user_name}, _state) do
     :ets.delete(:user, user_name)
+    {:noreply, {}}
+  end
+
+  def handle_cast({:retweet, original_tweet_id, username}, _state) do
+    {_, tweet, tweeter, _} = get_tweet(original_tweet_id)
+    new_tweet_id = UUID.uuid1()
+    new_tweet = {new_tweet_id, tweet, username, original_tweet_id}
+    :ets.insert(:tweets, new_tweet)
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
+    usermap = Map.put(usermap, :tweet_ids, [new_tweet | Map.get(usermap, :tweet_ids, [])])
+    :ets.insert(:users, {username, usermap})
     {:noreply, {}}
   end
 
@@ -237,24 +255,32 @@ defmodule Twitter.Server do
     end)
   end
 
-  def process_mentions(username, tweet_id, tweet) do
+  def process_mentions(username, tweet_tuple) do
     user = :ets.lookup(:users, username)
+    tweet_id = elem(tweet_tuple, 0)
 
     if length(user) > 0 do
       [{username, user_map}] = user
       mentioned_list = [tweet_id | Map.get(user_map, :mentions, [])]
       user_map = Map.put(user_map, :mentions, mentioned_list)
       :ets.insert(:users, {username, user_map})
-      distribute_live(username, tweet, tweet_id)
+      distribute_live(username, tweet_tuple)
     end
   end
 
-  def distribute_live(username, tweet, tweet_id) do
+  def distribute_to_following(tweet_tuple) do
+    tweeter = elem(tweet_tuple, 2)
+    [{_, tweeter_map}] = :ets.lookup(:active_users, tweeter)
+    followers = Map.get(tweeter_map, :followers, [])
+    Enum.each(followers, fn follower_id -> distribute_live(follower_id, tweet_tuple) end)
+  end
+
+  def distribute_live(username, tweet_tuple) do
     user = :ets.lookup(:active_users, username)
 
     if length(user) > 0 do
       [{_, user_pid}] = user
-      Twitter.Client.distribute_live(user_pid, tweet, tweet_id)
+      Twitter.Client.distribute_live(user_pid, tweet_tuple)
     end
   end
 
@@ -283,11 +309,6 @@ defmodule Twitter.Server do
 
   def get_tweet(tweet_id) do
     [tup] = :ets.lookup(:tweets, tweet_id)
-
-    if length(tup) > 0 do
-      elem(tup, 1)
-    else
-      nil
-    end
+    if length(tup) > 0, do: tup, else: nil
   end
 end
