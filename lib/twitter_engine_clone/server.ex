@@ -40,6 +40,9 @@ defmodule Twitter.Server do
   def tweet(tweet, username),
     do: GenServer.cast(:server, {:handle_tweet, tweet, username})
 
+  def delete_account(username),
+    do: GenServer.cast(:server, {:delete_account, username})
+
   def handle_call({:query_subscribed_tweets, username}, _from, _state) do
     usermap = elem(:ets.lookup(:users, username), 1)
     following = Map.get(usermap, :following, [])
@@ -110,7 +113,7 @@ defmodule Twitter.Server do
     {:reply, :ets.insert_new(:active_users, {user_name, pid}), {}}
   end
 
-  def handle_call({:logout_user, user_name}, _from, _state) do
+  def handle_cast({:logout_user, user_name}, _state) do
     :ets.delete(:active_users, user_name)
     {:noreply, {}}
   end
@@ -162,6 +165,11 @@ defmodule Twitter.Server do
       end
     end
 
+    {:noreply, {}}
+  end
+
+  def handle_cast({:delete, user_name}, _state) do
+    :ets.delete(:user, user_name)
     {:noreply, {}}
   end
 

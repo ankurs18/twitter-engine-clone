@@ -11,6 +11,8 @@ defmodule Twitter.Client do
     {:ok, %{:username => username}}
   end
 
+  def get_feed(pid), do: GenServer.call(pid, {:get_feed}, :infinity)
+
   def get_username(pid), do: GenServer.call(pid, {:get_username}, :infinity)
 
   def register(pid), do: GenServer.cast(pid, {:register})
@@ -23,6 +25,8 @@ defmodule Twitter.Client do
 
   def tweet(pid, message), do: GenServer.cast(pid, {:tweet, message})
 
+  def retweet(pid, tweet_id), do: GenServer.cast(pid, {:retweet, tweet_id})
+
   def follow(pid, follower_name), do: GenServer.cast(pid, {:follow, follower_name})
 
   def unfollow(pid, name), do: GenServer.cast(pid, {:unfollow, name})
@@ -34,10 +38,10 @@ defmodule Twitter.Client do
   def distribute_live(pid, tweet, tweet_id),
     do: GenServer.cast(pid, {:distribute_live, tweet, tweet_id})
 
-  def handle_cast({:distribute_live, tweet, tweet_id}, state) do
+  def handle_cast({:distribute_live, {tweet_id, tweet, username, original_id}}, state) do
     tweets_list = Map.get(state, :tweets, [])
 
-    {:noreply, Map.put(state, :tweets, [{tweet_id, tweet} | tweets_list])}
+    {:noreply, Map.put(state, :tweets, [{tweet_id, tweet, username, original_id} | tweets_list])}
   end
 
   def handle_cast({:register}, state) do
@@ -45,7 +49,7 @@ defmodule Twitter.Client do
     Logger.debug("Registering #{username} to the server")
 
     case Twitter.Server.register_user(username, self()) do
-      :duplicate_user_error -> IO.inspect("Client ID already exists")
+      :duplicate_user_error -> IO.inspect("Client ID already exists!")
       _ -> Logger.debug("#{username} registered")
     end
 
@@ -55,7 +59,12 @@ defmodule Twitter.Client do
   def handle_cast({:login}, state) do
     username = Map.get(state, :username)
     Logger.debug("login #{username} detail to the server")
-    Twitter.Server.login_user(username, self())
+
+    case Twitter.Server.login_user(username, self()) do
+      false -> IO.inspect("Already logged in though another process!")
+      _ -> Logger.debug("#{username} logged in")
+    end
+
     {:noreply, state}
   end
 
@@ -69,7 +78,7 @@ defmodule Twitter.Client do
   def handle_cast({:delete_account}, state) do
     username = Map.get(state, :username)
     Logger.debug("deleting #{username} from the server")
-    # Twitter.Server.delete_account(server, username, self())
+    Twitter.Server.delete_account(username)
     {:noreply, state}
   end
 
@@ -77,6 +86,13 @@ defmodule Twitter.Client do
     username = Map.get(state, :username)
     Logger.debug("User #{username} tweeted #{message}")
     Twitter.Server.tweet(message, username)
+    {:noreply, state}
+  end
+
+  def handle_cast({:retweet, tweet_id}, state) do
+    username = Map.get(state, :username)
+    Logger.debug("User #{username} retweeted #{tweet_id}")
+    Twitter.Server.retweet(tweet_id, username)
     {:noreply, state}
   end
 
@@ -100,7 +116,7 @@ defmodule Twitter.Client do
     cond do
       type == :subscribed ->
         Twitter.Server.query_subscribed_tweets(username)
-        Logger.debug("Get subscriber tweets of @#{data}")
+        Logger.debug("Get subscriber tweets")
 
       type == :hashtags ->
         Twitter.Server.query_hashtag(data)
@@ -112,5 +128,10 @@ defmodule Twitter.Client do
     end
 
     {:reply, username, state}
+  end
+
+  def handle_call({:get_feed, type, data}, _from, state) do
+    feeds = Map.get(state, :tweets)
+    {:reply, feeds, state}
   end
 end

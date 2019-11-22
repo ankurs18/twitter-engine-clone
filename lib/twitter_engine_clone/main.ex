@@ -37,6 +37,8 @@ defmodule Twitter.Main do
         {_, client_pid} = client
         Twitter.Client.tweet(client_pid, message)
       end
+
+      # some user goes offline
     end
   end
 
