@@ -31,12 +31,12 @@ defmodule Twitter.Client do
 
   def unfollow(pid, name), do: GenServer.cast(pid, {:unfollow, name})
 
-  def get_tweets(pid, {:hashtags, data}), do: GenServer.cast(pid, {:get_tweets, :hashtag, data})
+  def get_tweets(pid, :hashtags, data), do: GenServer.call(pid, {:get_tweets, :hashtags, data})
 
-  def get_tweets(pid, type), do: GenServer.cast(pid, {:get_tweets, type, nil})
+  def get_tweets(pid, type), do: GenServer.call(pid, {:get_tweets, type, nil})
 
-  def distribute_live(pid, tweet, tweet_id),
-    do: GenServer.cast(pid, {:distribute_live, tweet, tweet_id})
+  def distribute_live(pid, tweet),
+    do: GenServer.cast(pid, {:distribute_live, tweet})
 
   def handle_cast({:distribute_live, {tweet_id, tweet, username, original_id}}, state) do
     tweets_list = Map.get(state, :tweets, [])
@@ -115,22 +115,22 @@ defmodule Twitter.Client do
 
     cond do
       type == :subscribed ->
-        Twitter.Server.query_subscribed_tweets(username)
         Logger.debug("Get subscriber tweets")
+        {:reply, Twitter.Server.query_subscribed_tweets(username), state}
 
       type == :hashtags ->
-        Twitter.Server.query_hashtag(data)
-        Logger.debug("Get tweets of @#{data}")
+        Logger.debug("Get tweets of ##{data}")
+        len = String.length(data)
+        data = String.slice(data, 1..(len - 1))
+        {:reply, Twitter.Server.query_hashtag(data), state}
 
       type == :mentions ->
-        Twitter.Server.query_mentions(username)
         Logger.debug("Get tweets of @#{data}")
+        {:reply, Twitter.Server.query_mentions(username), state}
     end
-
-    {:reply, username, state}
   end
 
-  def handle_call({:get_feed, type, data}, _from, state) do
+  def handle_call({:get_feed}, _from, state) do
     feeds = Map.get(state, :tweets)
     {:reply, feeds, state}
   end

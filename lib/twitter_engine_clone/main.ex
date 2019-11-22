@@ -137,3 +137,7 @@ defmodule Twitter.Main do
     |> Enum.join("")
   end
 end
+
+# [{_, pid}]= :ets.lookup(:active_users, "EBQHZMAC")
+# Twitter.Client.get_tweets(pid, :mentions)
+# Twitter.Main.start

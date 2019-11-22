@@ -47,7 +47,8 @@ defmodule Twitter.Server do
     do: GenServer.cast(:server, {:delete_account, username})
 
   def handle_call({:query_subscribed_tweets, username}, _from, _state) do
-    usermap = elem(:ets.lookup(:users, username), 1)
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
     following = Map.get(usermap, :following, [])
 
     tweets_list =
@@ -59,7 +60,8 @@ defmodule Twitter.Server do
   end
 
   def handle_call({:query_mentions, username}, _from, _state) do
-    usermap = elem(:ets.lookup(:users, username), 1)
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
     mentions = Map.get(usermap, :mentions, [])
 
     tweets_list =
@@ -71,7 +73,8 @@ defmodule Twitter.Server do
   end
 
   def handle_call({:get_user_tweets, username}, _from, _state) do
-    usermap = elem(:ets.lookup(:users, username), 1)
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
     tweet_ids = Map.get(usermap, :tweet_ids, [])
 
     tweets_list =
@@ -89,6 +92,8 @@ defmodule Twitter.Server do
       if tweet_ids == [] do
         []
       else
+        tweet_ids = Enum.at(tweet_ids, 0) |> elem(1)
+
         Enum.reduce(tweet_ids, [], fn tweet_id, acc ->
           [tup] = :ets.lookup(:tweets, tweet_id)
           [tup | acc]
@@ -180,7 +185,7 @@ defmodule Twitter.Server do
   end
 
   def handle_cast({:retweet, original_tweet_id, username}, _state) do
-    {_, tweet, tweeter, _} = get_tweet(original_tweet_id)
+    {_, tweet, _tweeter, _} = get_tweet(original_tweet_id)
     new_tweet_id = UUID.uuid1()
     new_tweet = {new_tweet_id, tweet, username, original_tweet_id}
     :ets.insert(:tweets, new_tweet)
@@ -270,7 +275,7 @@ defmodule Twitter.Server do
 
   def distribute_to_following(tweet_tuple) do
     tweeter = elem(tweet_tuple, 2)
-    [{_, tweeter_map}] = :ets.lookup(:active_users, tweeter)
+    [{_, tweeter_map}] = :ets.lookup(:users, tweeter)
     followers = Map.get(tweeter_map, :followers, [])
     Enum.each(followers, fn follower_id -> distribute_live(follower_id, tweet_tuple) end)
   end
@@ -308,7 +313,7 @@ defmodule Twitter.Server do
   end
 
   def get_tweet(tweet_id) do
-    [tup] = :ets.lookup(:tweets, tweet_id)
-    if length(tup) > 0, do: tup, else: nil
+    lookup = :ets.lookup(:tweets, tweet_id)
+    if length(lookup) > 0, do: Enum.at(lookup, 0), else: nil
   end
 end
