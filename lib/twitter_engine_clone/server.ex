@@ -1,7 +1,9 @@
 defmodule Twitter.Server do
   use GenServer
+  require Logger
 
   ############################## API #################################
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, :no_args, name: :server)
   end
@@ -103,9 +105,9 @@ defmodule Twitter.Server do
 
       :ets.insert(:users, {follower_id, follower_map})
       :ets.insert(:users, {following_id, following_map})
-      {:reply, {:success}, {}}
+      {:reply, {:success, nil}, {}}
     else
-      {:reply, {:user_not_found}, {}}
+      {:reply, {:failure, :user_not_found}, {}}
     end
   end
 
@@ -175,14 +177,15 @@ defmodule Twitter.Server do
     {:noreply, {}}
   end
 
-  def handle_cast({:logout_user, user_name}, _state) do
-    :ets.delete(:active_users, user_name)
+  def handle_cast({:logout_user, username}, _state) do
+    Logger.debug("logging out #{username}")
+    :ets.delete(:active_users, username)
     {:noreply, {}}
   end
   
-  def handle_cast({:delete, user_name}, _state) do
-    :ets.delete(:users, user_name)
-    :ets.delete(:active_users, user_name)
+  def handle_cast({:delete_account, username}, _state) do
+    :ets.delete(:users, username)
+    :ets.delete(:active_users, username)
     {:noreply, {}}
   end
 
