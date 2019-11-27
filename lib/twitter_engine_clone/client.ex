@@ -38,15 +38,17 @@ defmodule Twitter.Client do
   def distribute_live(pid, tweet),
     do: GenServer.cast(pid, {:distribute_live, tweet})
 
-  def handle_cast({:distribute_live, {tweet_id, tweet, username, original_id}}, state) do
+  def handle_cast({:distribute_live, tweet}, state) do
+    username = Map.get(state, :username)
+    Logger.debug("Notified to live user @#{username}")
     tweets_list = Map.get(state, :tweets, [])
 
-    {:noreply, Map.put(state, :tweets, [{tweet_id, tweet, username, original_id} | tweets_list])}
+    {:noreply, Map.put(state, :tweets, [tweet | tweets_list])}
   end
 
   def handle_cast({:register}, state) do
     username = Map.get(state, :username)
-    Logger.debug("Registering #{username} to the server")
+    Logger.debug("Registering @#{username} to the server")
 
     case Twitter.Server.register_user(username, self()) do
       :duplicate_user_error -> IO.inspect("Client ID already exists!")
@@ -58,12 +60,19 @@ defmodule Twitter.Client do
 
   def handle_cast({:login}, state) do
     username = Map.get(state, :username)
-    Logger.debug("login #{username} detail to the server")
+    Logger.debug("Trying logging in #{username} to the server")
+    list = Twitter.Server.login_user(username, self())
 
-    case Twitter.Server.login_user(username, self()) do
-      false -> IO.inspect("Already logged in though another process!")
-      _ -> Logger.debug("#{username} logged in")
-    end
+    state =
+      case list do
+        false ->
+          IO.inspect("Already logged in though another process!")
+          state
+
+        _ ->
+          Logger.debug("#{username} logged in")
+          Map.put(state, :tweets, list)
+      end
 
     {:noreply, state}
   end
@@ -72,6 +81,7 @@ defmodule Twitter.Client do
     username = Map.get(state, :username)
     Logger.debug("loging out #{username}")
     Twitter.Server.logout_user(username)
+    Process.exit(self(), :normal)
     {:noreply, state}
   end
 

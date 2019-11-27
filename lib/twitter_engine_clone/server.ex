@@ -158,7 +158,7 @@ defmodule Twitter.Server do
 
     if String.contains?(tweet, "@") do
       users_mentioned = parse_mentions(tweet)
-      IO.inspect({"mention", users_mentioned})
+      # IO.inspect({"mention", users_mentioned})
 
       if length(users_mentioned) > 0 do
         Enum.each(users_mentioned, &process_mentions(&1, tweet_tuple))
@@ -169,7 +169,7 @@ defmodule Twitter.Server do
 
     if String.contains?(tweet, "#") do
       hashtags = parse_hashtags(tweet)
-      IO.inspect({"hastags", hashtags})
+      # IO.inspect({"hastags", hashtags})
 
       if length(hashtags) > 0 do
         Enum.each(hashtags, &process_hashtags(&1, tweet_id))
@@ -205,7 +205,7 @@ defmodule Twitter.Server do
         if i == 0 or Enum.at(charlist, i - 1) == 32 do
           sublist_to_right = Enum.slice(charlist, i + 1, tweet_length - i + 1)
           len = length(sublist_to_right)
-          IO.inspect({"sublist", c, i, sublist_to_right})
+          # IO.inspect({"sublist", c, i, sublist_to_right})
           index_of_space = Enum.find_index(sublist_to_right, fn x -> x == 32 end)
 
           mentioned_user_name =
@@ -232,7 +232,7 @@ defmodule Twitter.Server do
         if i == 0 or Enum.at(charlist, i - 1) == 32 do
           sublist_to_right = Enum.slice(charlist, i + 1, tweet_length - i + 1)
           len = length(sublist_to_right)
-          IO.inspect({"sublist", c, i, sublist_to_right})
+          # IO.inspect({"sublist", c, i, sublist_to_right})
           index_of_space = Enum.find_index(sublist_to_right, fn x -> x == 32 end)
 
           mentioned_user_name =
@@ -293,11 +293,11 @@ defmodule Twitter.Server do
     hashtag_list = :ets.lookup(:hashtags, hashtag)
 
     if length(hashtag_list) > 0 do
-      IO.inspect({hashtag, tweet_id, hashtag_list})
+      # IO.inspect({hashtag, tweet_id, hashtag_list})
       [{_, hashtag_list}] = hashtag_list
       :ets.insert(:hashtags, {hashtag, [tweet_id | hashtag_list]})
     else
-      IO.inspect({hashtag, tweet_id, hashtag_list})
+      # IO.inspect({hashtag, tweet_id, hashtag_list})
       :ets.insert(:hashtags, {hashtag, [tweet_id]})
     end
   end

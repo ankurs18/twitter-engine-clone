@@ -13,6 +13,8 @@ defmodule Twitter.Main do
     "#GOT",
     "#Avengers"
   ]
+  IO.puts("Simulation starts...")
+
   def start(num_client \\ 10, num_message \\ 10) do
     :observer.start()
     {:ok, _server_pid} = Twitter.Server.start_link(:no_args)
@@ -31,14 +33,67 @@ defmodule Twitter.Main do
       # Make Followers
       number_of_followers = div(Enum.random(1..50) * len, 100)
       randomFollowing(client, clients, number_of_followers)
-      # Tweet num_messages
-      for(_ <- 1..num_message) do
-        message = tweet_scenarios(Enum.random(1..4), clients -- [client])
-        {_, client_pid} = client
-        Twitter.Client.tweet(client_pid, message)
-      end
-
       # some user goes offline
+    end
+
+    Task.start_link(__MODULE__, :check_status, [num_client * num_message])
+
+    for client <- clients do
+      # Tweet num_messages
+
+      Task.start_link(__MODULE__, :send_tweets, [
+        client,
+        clients,
+        num_message
+      ])
+    end
+
+    {:ok}
+  end
+
+  def send_tweets(client, clients, num_messages) do
+    if(num_messages > 0) do
+      message = tweet_scenarios(Enum.random(1..4), clients -- [client])
+      {client_name, client_pid} = client
+      # if less than 2 then sleep
+      if(trunc(:rand.uniform(10)) < 3) do
+        Twitter.Client.logout(client_pid)
+        Process.sleep(1000)
+        {:ok, client_pid} = Twitter.Client.start_link(client_name)
+        Twitter.Client.login(client_pid)
+        send_tweets({client_name, client_pid}, clients, num_messages)
+      else
+        Twitter.Client.tweet(client_pid, message)
+        Process.sleep(20)
+        send_tweets(client, clients, num_messages - 1)
+      end
+    end
+  end
+
+  def check_status(total_tweets) do
+    number_of_tweets = elem(Enum.at(:ets.info(:tweets), 8), 1)
+
+    if(total_tweets >= number_of_tweets) do
+      users = elem(Enum.at(:ets.info(:users), 8), 1)
+      online_users = elem(Enum.at(:ets.info(:active_users), 8), 1)
+      offline_users = users - online_users
+      Logger.info("##############  Server Status  ################")
+      Logger.info("Number of tweets sent: #{number_of_tweets}")
+      Logger.info("Online users: #{online_users}")
+      Logger.info("Offline users: #{offline_users}")
+      Logger.info("###############################################")
+
+      Process.sleep(1000)
+
+      total_tweets =
+        if(total_tweets == number_of_tweets) do
+          IO.puts("Simulation Ends...")
+          0
+        else
+          total_tweets
+        end
+
+      check_status(total_tweets)
     end
   end
 
