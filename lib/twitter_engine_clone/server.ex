@@ -1,5 +1,8 @@
 defmodule Twitter.Server do
   use GenServer
+  require Logger
+
+  ############################## API #################################
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, :no_args, name: :server)
@@ -46,30 +49,14 @@ defmodule Twitter.Server do
   def delete_account(username),
     do: GenServer.cast(:server, {:delete_account, username})
 
+  ############################## Server #################################
+
   def handle_call({:query_subscribed_tweets, username}, _from, _state) do
-    [user] = :ets.lookup(:users, username)
-    usermap = elem(user, 1)
-    following = Map.get(usermap, :following, [])
-
-    tweets_list =
-      Enum.reduce(following, [], fn following_username, acc ->
-        [get_user_tweets(following_username) | acc]
-      end)
-
-    {:reply, tweets_list, {}}
+    {:reply, fetch_subscibed_tweets(username), {}}
   end
 
   def handle_call({:query_mentions, username}, _from, _state) do
-    [user] = :ets.lookup(:users, username)
-    usermap = elem(user, 1)
-    mentions = Map.get(usermap, :mentions, [])
-
-    tweets_list =
-      Enum.reduce(mentions, [], fn tweet_id, acc ->
-        [get_tweet(tweet_id) | acc]
-      end)
-
-    {:reply, tweets_list, {}}
+    {:reply, fetch_mentions(username), {}}
   end
 
   def handle_call({:get_user_tweets, username}, _from, _state) do
@@ -103,29 +90,6 @@ defmodule Twitter.Server do
     {:reply, tweets_list, {}}
   end
 
-  def handle_call({:register_user, user_name, pid}, _from, _state) do
-    is_inserted = :ets.insert_new(:users, {user_name, %{}})
-
-    if is_inserted == true do
-      # login_user(user_name, pid)
-      :ets.insert_new(:active_users, {user_name, pid})
-      {:reply, {:success}, {}}
-    else
-      {:reply, {:duplicate_user_error}, {}}
-    end
-  end
-
-  def handle_call({:login_user, user_name, pid}, _from, _state) do
-    # live_handler_pid = spawn_link(fn _ -> live_handler(user_name, pid) end)
-
-    {:reply, :ets.insert_new(:active_users, {user_name, pid}), {}}
-  end
-
-  def handle_cast({:logout_user, user_name}, _state) do
-    :ets.delete(:active_users, user_name)
-    {:noreply, {}}
-  end
-
   def handle_call({:follow_user, follower_id, following_id}, _from, _state) do
     follower = :ets.lookup(:users, follower_id)
     following = :ets.lookup(:users, following_id)
@@ -141,9 +105,31 @@ defmodule Twitter.Server do
 
       :ets.insert(:users, {follower_id, follower_map})
       :ets.insert(:users, {following_id, following_map})
+      {:reply, {:success, nil}, {}}
+    else
+      {:reply, {:failure, :user_not_found}, {}}
+    end
+  end
+
+  def handle_call({:register_user, user_name, pid}, _from, _state) do
+    is_inserted = :ets.insert_new(:users, {user_name, %{}})
+
+    if is_inserted == true do
+      :ets.insert_new(:active_users, {user_name, pid})
       {:reply, {:success}, {}}
     else
-      {:reply, {:user_not_found}, {}}
+      {:reply, {:duplicate_user_error}, {}}
+    end
+  end
+
+  def handle_call({:login_user, username, pid}, _from, _state) do
+    # live_handler_pid = spawn_link(fn _ -> live_handler(user_name, pid) end)
+    is_successfull = :ets.insert_new(:active_users, {username, pid})
+
+    if is_successfull do
+      {:reply, {:success, fetch_feed(username)}, {}}
+    else
+      {:reply, {:failure}, {}}
     end
   end
 
@@ -179,11 +165,6 @@ defmodule Twitter.Server do
     {:noreply, {}}
   end
 
-  def handle_cast({:delete, user_name}, _state) do
-    :ets.delete(:user, user_name)
-    {:noreply, {}}
-  end
-
   def handle_cast({:retweet, original_tweet_id, username}, _state) do
     {_, tweet, _tweeter, _} = get_tweet(original_tweet_id)
     new_tweet_id = UUID.uuid1()
@@ -194,6 +175,45 @@ defmodule Twitter.Server do
     usermap = Map.put(usermap, :tweet_ids, [new_tweet | Map.get(usermap, :tweet_ids, [])])
     :ets.insert(:users, {username, usermap})
     {:noreply, {}}
+  end
+
+  def handle_cast({:logout_user, username}, _state) do
+    Logger.debug("logging out #{username}")
+    :ets.delete(:active_users, username)
+    {:noreply, {}}
+  end
+  
+  def handle_cast({:delete_account, username}, _state) do
+    :ets.delete(:users, username)
+    :ets.delete(:active_users, username)
+    {:noreply, {}}
+  end
+
+  def fetch_feed(username) do
+    fetch_subscibed_tweets(username) ++ fetch_mentions(username)
+  end
+
+  def fetch_subscibed_tweets(username) do
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
+    following = Map.get(usermap, :following, [])
+
+    Enum.reduce(following, [], fn following_username, acc ->
+      [get_user_tweets(following_username) | acc]
+    end)
+  end
+
+  def fetch_mentions(username) do
+    [user] = :ets.lookup(:users, username)
+    usermap = elem(user, 1)
+    mentions = Map.get(usermap, :mentions, [])
+
+    tweets_list =
+      Enum.reduce(mentions, [], fn tweet_id, acc ->
+        [get_tweet(tweet_id) | acc]
+      end)
+
+    tweets_list
   end
 
   def parse_mentions(tweet) do
@@ -317,3 +337,4 @@ defmodule Twitter.Server do
     if length(lookup) > 0, do: Enum.at(lookup, 0), else: nil
   end
 end
+# DateTime.now("Etc/UTC")
