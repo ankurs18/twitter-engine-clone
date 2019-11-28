@@ -13,12 +13,13 @@ defmodule Twitter.Main do
     "#GOT",
     "#Avengers"
   ]
-  IO.puts("Simulation starts...")
 
   def start(num_client \\ 10, num_message \\ 10) do
     :observer.start()
+    start_time = System.monotonic_time(:millisecond)
     {:ok, _server_pid} = Twitter.Server.start_link(:no_args)
-    # Twitter.Server.register_user(server_pid, "ankur")
+
+    IO.puts("Simulation starts...")
 
     clients =
       for _i <- 1..num_client do
@@ -28,18 +29,17 @@ defmodule Twitter.Main do
         {client_name, client_pid}
       end
 
-    for client <- clients do
-      len = length(clients)
-      # Make Followers
-      number_of_followers = div(Enum.random(1..50) * len, 100)
-      randomFollowing(client, clients, number_of_followers)
-      # some user goes offline
-    end
+    clients
+    |> Enum.with_index(1)
+    |> Enum.each(fn {client,rank} ->      
+      number_of_followers = div(num_client, rank) - 1
+      IO.inspect({"rank", rank, num_client, number_of_followers})
+      generate_random_followers(client, clients, number_of_followers)
+    end)
 
     Task.start_link(__MODULE__, :check_status, [num_client * num_message])
 
     for client <- clients do
-      # Tweet num_messages
 
       Task.start_link(__MODULE__, :send_tweets, [
         client,
@@ -48,7 +48,7 @@ defmodule Twitter.Main do
       ])
     end
 
-    {:ok}
+    IO.puts("Time taken by simulator: #{start_time - System.monotonic_time(:millisecond)}")
   end
 
   def send_tweets(client, clients, num_messages) do
@@ -97,13 +97,14 @@ defmodule Twitter.Main do
     end
   end
 
-  def randomFollowing(client, clients, number_of_followers) do
+  def generate_random_followers(client, clients, number_of_followers) do
     if(number_of_followers > 0) do
       random_user = Enum.random(clients)
-      {_, client_pid} = client
-      {random_user_name, _} = random_user
-      Twitter.Client.follow(client_pid, random_user_name)
-      randomFollowing(client, clients -- [random_user], number_of_followers - 1)
+      # {_, client_pid} = client
+      # {random_user_name, _} = random_user
+      {_, follower_pid} = random_user
+      Twitter.Client.follow(follower_pid, elem(client,0))
+      generate_random_followers(client, clients -- [random_user], number_of_followers - 1)
     end
   end
 
