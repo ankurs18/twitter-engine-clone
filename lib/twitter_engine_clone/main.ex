@@ -31,24 +31,24 @@ defmodule Twitter.Main do
 
     clients
     |> Enum.with_index(1)
-    |> Enum.each(fn {client,rank} ->      
-      number_of_followers = div(num_client, rank) - 1
-      IO.inspect({"rank", rank, num_client, number_of_followers})
-      generate_random_followers(client, clients, number_of_followers)
+    |> Enum.each(fn {client, rank} ->
+      number_of_followers = if rank == 1, do: div(num_client, rank) - 1, else: div(num_client, rank)
+      #IO.inspect({"rank", rank, num_client, number_of_followers})
+      Task.start_link(__MODULE__, :generate_random_followers, [client, clients, number_of_followers])
+     #generate_random_followers(client, clients, number_of_followers)
     end)
-
-    Task.start_link(__MODULE__, :check_status, [num_client * num_message])
-
+    IO.puts("Time taken to generate followers: #{System.monotonic_time(:millisecond) - start_time}")
+    task = Task.async(__MODULE__, :log_server_status, [num_client * num_message])
+    
     for client <- clients do
-
       Task.start_link(__MODULE__, :send_tweets, [
         client,
         clients,
         num_message
       ])
     end
-
-    IO.puts("Time taken by simulator: #{start_time - System.monotonic_time(:millisecond)}")
+    Task.await(task, :infinity)
+    IO.puts("Time taken by simulator: #{System.monotonic_time(:millisecond) - start_time}")
   end
 
   def send_tweets(client, clients, num_messages) do
@@ -56,7 +56,7 @@ defmodule Twitter.Main do
       message = tweet_scenarios(Enum.random(1..4), clients -- [client])
       {client_name, client_pid} = client
       # if less than 2 then sleep
-      if(trunc(:rand.uniform(10)) < 3) do
+      if(trunc(:rand.uniform(10)) < 2) do
         Twitter.Client.logout(client_pid)
         Process.sleep(1000)
         {:ok, client_pid} = Twitter.Client.start_link(client_name)
@@ -70,7 +70,7 @@ defmodule Twitter.Main do
     end
   end
 
-  def check_status(total_tweets) do
+  def log_server_status(total_tweets) do
     number_of_tweets = elem(Enum.at(:ets.info(:tweets), 8), 1)
 
     if(total_tweets >= number_of_tweets) do
@@ -85,15 +85,12 @@ defmodule Twitter.Main do
 
       Process.sleep(1000)
 
-      total_tweets =
-        if(total_tweets == number_of_tweets) do
-          IO.puts("Simulation Ends...")
-          0
-        else
-          total_tweets
-        end
-
-      check_status(total_tweets)
+      if(total_tweets == number_of_tweets) do
+        :ok
+      else
+        log_server_status(total_tweets)
+      end
+      # log_server_status(total_tweets)
     end
   end
 
@@ -103,7 +100,7 @@ defmodule Twitter.Main do
       # {_, client_pid} = client
       # {random_user_name, _} = random_user
       {_, follower_pid} = random_user
-      Twitter.Client.follow(follower_pid, elem(client,0))
+      Twitter.Client.follow(follower_pid, elem(client, 0))
       generate_random_followers(client, clients -- [random_user], number_of_followers - 1)
     end
   end
@@ -134,7 +131,7 @@ defmodule Twitter.Main do
         end)
 
       scenario_num == 4 ->
-        Logger.debug("Scenario 4: Message with hashtags")
+        Logger.debug("Scenario 4: Message with hashtags and mention")
         mentions = get_mentions(clients, 1)
         hashtags = get_hash_tags(1)
         message = random_message_generator()

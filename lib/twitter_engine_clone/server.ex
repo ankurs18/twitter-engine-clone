@@ -182,7 +182,7 @@ defmodule Twitter.Server do
     :ets.delete(:active_users, username)
     {:noreply, {}}
   end
-  
+
   def handle_cast({:delete_account, username}, _state) do
     :ets.delete(:users, username)
     :ets.delete(:active_users, username)
@@ -273,7 +273,7 @@ defmodule Twitter.Server do
   def get_user_tweets(username) do
     [user] = :ets.lookup(:users, username)
     usermap = elem(user, 1)
-    tweet_ids = Map.get(usermap, :tweet_ids)
+    tweet_ids = Map.get(usermap, :tweet_ids, [])
 
     Enum.reduce(tweet_ids, [], fn tweet_id, acc ->
       [get_tweet(tweet_id) | acc]
@@ -337,4 +337,5 @@ defmodule Twitter.Server do
     if length(lookup) > 0, do: Enum.at(lookup, 0), else: nil
   end
 end
+
 # DateTime.now("Etc/UTC")
