@@ -1,7 +1,7 @@
 defmodule TwitterTest.Server do
   use ExUnit.Case
   doctest Twitter.Server
-  
+
   setup do
     {:ok, _} = Twitter.Server.start_link(:no_args)
     client = "Aditya"
@@ -95,7 +95,7 @@ defmodule TwitterTest.Server do
     :sys.get_state(:server)
     tweet_ids = :ets.match(:tweets, {:"$1", :_, state[:client], :_})
     tweet_ids = List.flatten(tweet_ids)
-    IO.inspect({"flat", tweet_ids})
+    # IO.inspect({"flat", tweet_ids})
     [{_, client2_map}] = :ets.lookup(:users, state[:client2])
     list_from_ets = Map.get(client2_map, :mentions)
     assert Enum.sort(list_from_ets) == Enum.sort(tweet_ids)

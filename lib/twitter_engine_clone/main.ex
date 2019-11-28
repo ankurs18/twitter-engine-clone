@@ -13,12 +13,13 @@ defmodule Twitter.Main do
     "#GOT",
     "#Avengers"
   ]
-  IO.puts("Simulation starts...")
 
   def start(num_client \\ 10, num_message \\ 10) do
     :observer.start()
     {:ok, _server_pid} = Twitter.Server.start_link(:no_args)
     # Twitter.Server.register_user(server_pid, "ankur")
+    IO.puts("Server has started.")
+    IO.puts("Starting simulation...")
 
     clients =
       for _i <- 1..num_client do
@@ -29,14 +30,12 @@ defmodule Twitter.Main do
       end
 
     for client <- clients do
-      len = length(clients)
       # Make Followers
-      number_of_followers = div(Enum.random(1..50) * len, 100)
+      number_of_followers = div(Enum.random(1..50) * num_client, 100)
       randomFollowing(client, clients, number_of_followers)
-      # some user goes offline
     end
 
-    Task.start_link(__MODULE__, :check_status, [num_client * num_message])
+    Task.start_link(__MODULE__, :log_server_status, [num_client * num_message])
 
     for client <- clients do
       # Tweet num_messages
@@ -70,7 +69,7 @@ defmodule Twitter.Main do
     end
   end
 
-  def check_status(total_tweets) do
+  def log_server_status(total_tweets) do
     number_of_tweets = elem(Enum.at(:ets.info(:tweets), 8), 1)
 
     if(total_tweets >= number_of_tweets) do
@@ -93,7 +92,7 @@ defmodule Twitter.Main do
           total_tweets
         end
 
-      check_status(total_tweets)
+      log_server_status(total_tweets)
     end
   end
 
