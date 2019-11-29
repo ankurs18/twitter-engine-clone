@@ -129,7 +129,7 @@ defmodule Twitter.Server do
     if is_successfull do
       {:reply, {:success, fetch_feed(username)}, {}}
     else
-      {:reply, {:failure}, {}}
+      {:reply, {:failure, nil}, {}}
     end
   end
 
@@ -172,7 +172,7 @@ defmodule Twitter.Server do
     :ets.insert(:tweets, new_tweet)
     [user] = :ets.lookup(:users, username)
     usermap = elem(user, 1)
-    usermap = Map.put(usermap, :tweet_ids, [new_tweet | Map.get(usermap, :tweet_ids, [])])
+    usermap = Map.put(usermap, :tweet_ids, [new_tweet_id | Map.get(usermap, :tweet_ids, [])])
     :ets.insert(:users, {username, usermap})
     {:noreply, {}}
   end
@@ -190,7 +190,9 @@ defmodule Twitter.Server do
   end
 
   def fetch_feed(username) do
-    fetch_subscibed_tweets(username) ++ fetch_mentions(username)
+    x = fetch_subscibed_tweets(username)
+    y = fetch_mentions(username)
+    x ++ y
   end
 
   def fetch_subscibed_tweets(username) do
@@ -199,7 +201,7 @@ defmodule Twitter.Server do
     following = Map.get(usermap, :following, [])
 
     Enum.reduce(following, [], fn following_username, acc ->
-      [get_user_tweets(following_username) | acc]
+      get_user_tweets(following_username) ++ acc
     end)
   end
 

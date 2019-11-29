@@ -52,8 +52,18 @@ defmodule Twitter.Main do
 
   def send_tweets(client, clients, num_messages) do
     if(num_messages > 0) do
-      message = tweet_scenarios(Enum.random(1..4), clients -- [client])
       {client_name, client_pid} = client
+      client_feed = Twitter.Client.get_feed(client_pid)
+
+      scenario_type =
+        if(client_feed != nil and length(client_feed) > 0) do
+          Enum.random(1..5)
+        else
+          Enum.random(1..4)
+        end
+
+      message = tweet_scenarios(scenario_type, clients -- [client], client_feed)
+
       # if less than 2 then sleep
       if(trunc(:rand.uniform(10)) < 3) do
         Twitter.Client.logout(client_pid)
@@ -62,7 +72,12 @@ defmodule Twitter.Main do
         Twitter.Client.login(client_pid)
         send_tweets({client_name, client_pid}, clients, num_messages)
       else
-        Twitter.Client.tweet(client_pid, message)
+        if(scenario_type == 5) do
+          Twitter.Client.retweet(client_pid, message)
+        else
+          Twitter.Client.tweet(client_pid, message)
+        end
+
         Process.sleep(20)
         send_tweets(client, clients, num_messages - 1)
       end
@@ -82,7 +97,7 @@ defmodule Twitter.Main do
       Logger.info("Offline users: #{offline_users}")
       Logger.info("###############################################")
 
-      Process.sleep(1000)
+      Process.sleep(1500)
 
       total_tweets =
         if(total_tweets == number_of_tweets) do
@@ -106,7 +121,7 @@ defmodule Twitter.Main do
     end
   end
 
-  def tweet_scenarios(scenario_num, clients) do
+  def tweet_scenarios(scenario_num, clients, client_feed) do
     cond do
       scenario_num == 1 ->
         Logger.debug("Scenario 1: Normal Message")
@@ -149,7 +164,11 @@ defmodule Twitter.Main do
           end)
 
         message
-        # scenario_num == 5 -> IO.inspect("5. Retweet")
+
+      scenario_num == 5 ->
+        Logger.debug("Scenario 5: Retweet")
+        {id, _, _, _} = Enum.random(client_feed)
+        id
     end
   end
 
