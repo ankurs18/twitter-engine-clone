@@ -15,7 +15,7 @@ defmodule Twitter.Main do
   ]
 
   def start(num_client \\ 10, num_message \\ 10) do
-    :observer.start()
+    # :observer.start()
     start_time = System.monotonic_time(:millisecond)
     {:ok, _server_pid} = Twitter.Server.start_link(:no_args)
 
@@ -68,32 +68,34 @@ defmodule Twitter.Main do
   def send_tweets(client, clients, num_messages) do
     if(num_messages > 0) do
       {client_name, client_pid} = client
-      client_feed = Twitter.Client.get_feed(client_pid)
-
-      scenario_type =
-        if(client_feed != nil and length(client_feed) > 0) do
-          Enum.random(1..5)
-        else
-          Enum.random(1..4)
-        end
-
-      message = tweet_scenarios(scenario_type, clients -- [client], client_feed)
 
       # if less than 2 then sleep
       if(trunc(:rand.uniform(10)) < 2) do
         Twitter.Client.logout(client_pid)
+
         Process.sleep(1000)
         {:ok, client_pid} = Twitter.Client.start_link(client_name)
         Twitter.Client.login(client_pid)
         send_tweets({client_name, client_pid}, clients, num_messages)
       else
+        client_feed = Twitter.Client.get_feed(client_pid)
+
+        scenario_type =
+          if(client_feed != nil and length(client_feed) > 0) do
+            Enum.random(1..5)
+          else
+            Enum.random(1..4)
+          end
+
+        message = tweet_scenarios(scenario_type, clients -- [client], client_feed)
+
         if(scenario_type == 5) do
           Twitter.Client.retweet(client_pid, message)
         else
           Twitter.Client.tweet(client_pid, message)
         end
 
-        Process.sleep(20)
+        Process.sleep(30)
         send_tweets(client, clients, num_messages - 1)
       end
     end

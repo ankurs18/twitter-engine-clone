@@ -60,17 +60,18 @@ defmodule Twitter.Client do
 
   def handle_cast({:login}, state) do
     username = Map.get(state, :username)
-    Logger.debug("Trying logging in #{username} to the server")
+    Logger.debug("Trying logging in #{username} #{inspect(self())} to the server")
     {status, list} = Twitter.Server.login_user(username, self())
 
+    # IO.inspect(status)
     state =
       case status do
         :success ->
-          Logger.debug("#{username} logged in")
+          Logger.debug("#{username} logged in #{inspect(self())}")
           Map.put(state, :tweets, list)
 
-        :error ->
-          IO.inspect("Already logged in though another process!")
+        :failure ->
+          Logger.warn("FAILED! #{username} #{inspect(self())}")
           state
       end
 

@@ -33,12 +33,6 @@ defmodule TwitterTest.Server do
     assert elem(tup, 1) == state[:client_pid]
   end
 
-  # right now we are not allowing an online user to login from another process
-  test "Login user -> already logged-in ", state do
-    Twitter.Server.register_user(state[:client], state[:client_pid])
-    assert elem(Twitter.Server.login_user(state[:client], state[:client_pid]), 0) == :failure
-  end
-
   test "Logout user", state do
     Twitter.Server.register_user(state[:client], state[:client_pid])
     [lookup] = :ets.lookup(:active_users, state[:client])

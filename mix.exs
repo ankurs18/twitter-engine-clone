@@ -7,7 +7,8 @@ defmodule TwitterEngineClone.MixProject do
       version: "0.1.0",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      escript: escript()
     ]
   end
 
@@ -17,6 +18,10 @@ defmodule TwitterEngineClone.MixProject do
       extra_applications: [:logger],
       mod: {TwitterEngineClone.Application, []}
     ]
+  end
+
+  defp escript do
+    [main_module: Twitter]
   end
 
   # Run "mix help deps" to learn about dependencies.

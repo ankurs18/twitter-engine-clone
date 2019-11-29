@@ -25,7 +25,7 @@ defmodule TwitterTest.Client do
     Twitter.Client.tweet(state[:client1_pid], message)
     :sys.get_state(state[:client1_pid])
     :sys.get_state(:server)
-    [[{client2_id, _, _, _}]] = Twitter.Client.get_tweets(state[:client2_pid], :subscribed)
+    [{client2_id, _, _, _}] = Twitter.Client.get_tweets(state[:client2_pid], :subscribed)
     [{id, _, _, _}] = Map.get(:sys.get_state(state[:client2_pid]), :tweets)
     # if queried tweet id is same as the id present in the state
     assert id == client2_id

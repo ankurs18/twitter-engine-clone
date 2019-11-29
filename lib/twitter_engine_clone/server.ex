@@ -10,7 +10,15 @@ defmodule Twitter.Server do
 
   def init(_) do
     :ets.new(:users, [:ordered_set, :public, :named_table])
-    :ets.new(:active_users, [:ordered_set, :public, :named_table])
+
+    :ets.new(:active_users, [
+      :ordered_set,
+      :public,
+      :named_table,
+      write_concurrency: true,
+      read_concurrency: true
+    ])
+
     :ets.new(:tweets, [:ordered_set, :public, :named_table])
     :ets.new(:hashtags, [:ordered_set, :public, :named_table])
     {:ok, {}}
@@ -124,12 +132,12 @@ defmodule Twitter.Server do
 
   def handle_call({:login_user, username, pid}, _from, _state) do
     # live_handler_pid = spawn_link(fn _ -> live_handler(user_name, pid) end)
-    is_successfull = :ets.insert_new(:active_users, {username, pid})
+    is_successfull = :ets.insert(:active_users, {username, pid})
 
     if is_successfull do
       {:reply, {:success, fetch_feed(username)}, {}}
     else
-      {:reply, {:failure, nil}, {}}
+      {:reply, {:failure, pid}, {}}
     end
   end
 
