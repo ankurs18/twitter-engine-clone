@@ -4,9 +4,9 @@ defmodule Twitter.Main do
   @chars "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890" |> String.split("", trim: true)
   @text "ABCDEFGHIJKLMNOPQRSTUVWXYZ " |> String.split("", trim: true)
   @hashtags [
-    "#PyaarEkDhokaHai",
+    "#COP5615isgreat",
     "#UFL",
-    "#PythonIsTheBest",
+    "#PythonVsElixir",
     "#MarvelVsDC",
     "#followme",
     "#SiliconValley",
@@ -21,25 +21,38 @@ defmodule Twitter.Main do
 
     IO.puts("Simulation starts...")
 
+    client_names = generate_client_id(num_client)
+    # Clients are created and registered
     clients =
-      for _i <- 1..num_client do
-        client_name = random_clientName(8)
+      for client_name <- client_names do
+        # client_name = random_clientName(8)
         {:ok, client_pid} = Twitter.Client.start_link(client_name)
         Twitter.Client.register(client_pid)
         {client_name, client_pid}
       end
 
+    # Followers are set to every client based on Zipf distribution
     clients
     |> Enum.with_index(1)
     |> Enum.each(fn {client, rank} ->
-      number_of_followers = if rank == 1, do: div(num_client, rank) - 1, else: div(num_client, rank)
-      #IO.inspect({"rank", rank, num_client, number_of_followers})
-      Task.start_link(__MODULE__, :generate_random_followers, [client, clients, number_of_followers])
-     #generate_random_followers(client, clients, number_of_followers)
+      number_of_followers =
+        if rank == 1, do: div(num_client, rank) - 1, else: div(num_client, rank)
+
+      Task.start_link(__MODULE__, :generate_random_followers, [
+        client,
+        clients,
+        number_of_followers
+      ])
+
+      # generate_random_followers(client, clients, number_of_followers)
     end)
-    IO.puts("Time taken to generate followers: #{System.monotonic_time(:millisecond) - start_time}")
+
+    IO.puts(
+      "Time taken to generate followers: #{System.monotonic_time(:millisecond) - start_time}"
+    )
+
     task = Task.async(__MODULE__, :log_server_status, [num_client * num_message])
-    
+
     for client <- clients do
       Task.start_link(__MODULE__, :send_tweets, [
         client,
@@ -47,6 +60,7 @@ defmodule Twitter.Main do
         num_message
       ])
     end
+
     Task.await(task, :infinity)
     IO.puts("Time taken by simulator: #{System.monotonic_time(:millisecond) - start_time}")
   end
@@ -105,6 +119,7 @@ defmodule Twitter.Main do
       else
         log_server_status(total_tweets)
       end
+
       # log_server_status(total_tweets)
     end
   end
@@ -195,18 +210,32 @@ defmodule Twitter.Main do
     end)
   end
 
-  def random_clientName(length) do
-    Enum.reduce(1..length, [], fn _i, acc ->
-      [Enum.random(@chars) | acc]
-    end)
-    |> Enum.join("")
-  end
+  # def random_clientName(length) do
+  #   Enum.reduce(1..length, [], fn _i, acc ->
+  #     [Enum.random(@chars) | acc]
+  #   end)
+  #   |> Enum.join("")
+  # end
 
   def random_message_generator() do
     Enum.reduce(1..100, [], fn _i, acc ->
       [String.downcase(Enum.random(@text)) | acc]
     end)
     |> Enum.join("")
+  end
+
+  defp generate_client_id(num_nodes) do
+    Enum.reduce(1..num_nodes, MapSet.new(), &add_unique/2)
+  end
+
+  defp add_unique(_, acc) do
+    new_set =
+      MapSet.put(
+        acc,
+        Enum.join(Enum.reduce(1..8, [], fn _, gen -> [Enum.random(@chars) | gen] end))
+      )
+
+    if MapSet.size(acc) < MapSet.size(new_set), do: new_set, else: add_unique(1, acc)
   end
 end
 
