@@ -137,4 +137,19 @@ defmodule TwitterTest.Server do
     list_from_ets = Map.get(client2_map, :mentions)
     assert list_from_ets == list_from_server
   end
+
+  test "Query tweets (own)", state do
+    Twitter.Server.register_user(state[:client], state[:client_pid])
+    Twitter.Server.tweet("demo tweet", state[:client])
+    Twitter.Server.tweet("demo tweet2", state[:client])
+    :sys.get_state(:server)
+
+    list_from_server =
+      Enum.reduce(Twitter.Server.query_own_tweets(state[:client]), [], fn {_, tweet, _, _}, acc ->
+        [tweet|acc]
+      end)
+    
+    assert Enum.find_index(list_from_server, fn x -> x=="demo tweet"end) != nil
+    assert Enum.find_index(list_from_server, fn x -> x=="demo tweet2"end) != nil
+  end
 end
